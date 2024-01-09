@@ -7,4 +7,8 @@ namespace DownloadExcel.Models
         public int Status { get; set; }
         public FileContentResult File { get; set; }
     }
+    public class ListWrapper<T>
+    {
+        public List<T> Items { get; set; }
+    }
 }

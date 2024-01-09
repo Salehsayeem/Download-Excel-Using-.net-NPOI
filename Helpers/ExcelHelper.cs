@@ -1,18 +1,44 @@
-﻿using NPOI.XSSF.UserModel;
+﻿using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
 
 namespace DownloadExcel.Helpers
 {
     public class ExcelHelper
     {
-        public static byte[] CreateFile<T>(List<T> source)
+        public static byte[] CreateFile<T>(List<T> source, string fileType)
         {
-            var workbook = new XSSFWorkbook();
+            IWorkbook workbook;
+
+            if (fileType == "xlsx")
+            {
+                workbook = new XSSFWorkbook();
+                CreateXlsxContent(workbook, source);
+            }
+            else if (fileType == "csv")
+            {
+                workbook = new XSSFWorkbook();
+                return CreateCsvContent(source);
+            }
+            else
+            {
+                throw new NotSupportedException($"File type '{fileType}' is not supported.");
+            }
+
+            using (var stream = new MemoryStream())
+            {
+                workbook.Write(stream);
+                return stream.ToArray();
+            }
+        }
+
+        private static void CreateXlsxContent<T>(IWorkbook workbook, List<T> source)
+        {
             var sheet = workbook.CreateSheet("Sheet1");
             var rowHeader = sheet.CreateRow(0);
 
             var properties = typeof(T).GetProperties();
 
-            //header
+            // header
             var font = workbook.CreateFont();
             font.IsBold = true;
             var style = workbook.CreateCellStyle();
@@ -26,10 +52,9 @@ namespace DownloadExcel.Helpers
                 cell.CellStyle = style;
                 colIndex++;
             }
-            //end header
+            // end header
 
-
-            //content
+            // content
             var rowNum = 1;
             foreach (var item in source)
             {
@@ -69,15 +94,35 @@ namespace DownloadExcel.Helpers
 
                 rowNum++;
             }
+            // end content
+        }
 
-            //end content
+        private static byte[] CreateCsvContent<T>(List<T> source)
+        {
+            using (var memoryStream = new MemoryStream())
+            using (var writer = new StreamWriter(memoryStream))
+            {
+                var properties = typeof(T).GetProperties();
+                var header = string.Join(",", properties.Select(p => p.Name));
+                writer.WriteLine(header);
 
+                foreach (var item in source)
+                {
+                    var line = string.Join(",", properties.Select(p =>
+                    {
+                        var value = p.GetValue(item, null);
+                        return value == null
+                            ? ""
+                            : (p.PropertyType == typeof(DateTime)
+                                ? ((DateTime)value).ToString("yyyy-MM-dd")
+                                : value.ToString());
+                    }));
+                    writer.WriteLine(line);
+                }
 
-            var stream = new MemoryStream();
-            workbook.Write(stream);
-            var content = stream.ToArray();
-
-            return content;
+                writer.Flush();
+                return memoryStream.ToArray();
+            }
         }
     }
 }
